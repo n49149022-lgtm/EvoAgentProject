@@ -119,11 +119,33 @@
     return {type:bt,prio:pk(vp),route:pk(vr),sentiment:pk(vs),conf:tw>0?vt[bt]/tw:0,allScores:{t:vt,p:vp,r:vr,s:vs}};
   }
 
+  // ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ (защита от выхода за пределы LEX)
   function initPopulation(){
-    population=[];for(let i=0;i<POP;i++){const g=[];for(let j=0;j<GSIZE;j++){
-      if(j<NF*NH){const ti=Math.floor(j/NF),li=j%NF;g.push(LEX[li].t===ti?0.8+Math.random()*0.5:-0.5+Math.random()*0.5);}
-      else g.push((Math.random()-0.5)*0.5);}population.push({g,fit:0,age:0});}generation=0;
+    population=[];
+    for(let i=0;i<POP;i++){
+      const g=[];
+      for(let j=0;j<GSIZE;j++){
+        if(j < NF*NH){
+          const ti = Math.floor(j / NF);
+          const li = j % NF;
+          // Первые 15 признаков берут значения из LEX
+          if(li < LEX.length) {
+            g.push(LEX[li].t === ti ? 0.8 + Math.random()*0.5 : -0.5 + Math.random()*0.5);
+          } 
+          // Признаки 15-27 (структурные) инициализируются случайно
+          else {
+            g.push((Math.random() - 0.5) * 0.5);
+          }
+        } else {
+          // Веса второго слоя и смещения
+          g.push((Math.random() - 0.5) * 0.5);
+        }
+      }
+      population.push({g, fit:0, age:0});
+    }
+    generation = 0;
   }
+
   function evalFitness(ind,data){
     if(!data.length)return 0;let s=0;for(const d of data){const p=predictOne(d.f,ind.g);
     if(p.type===d.y)s+=1;if(p.prio===d.p)s+=0.5;if(p.route===d.r)s+=0.5;if(p.sentiment===d.s)s+=0.3;}
