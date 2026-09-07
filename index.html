@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=1200"><title>ЭвоАгент v5 Pro</title>
 <script src="core.js"></script>
-<!-- Парсеры (опционально, работают при наличии интернета) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
@@ -51,25 +50,6 @@ textarea:focus{outline:none;border-color:var(--accent)}textarea{min-height:140px
 <div class="tab" id="tb3"><div class="row"><button class="btn green" onclick="exportJSON()">📄 JSON</button><button class="btn" onclick="exportCSV()">📊 CSV</button></div><div class="row" style="margin-top:8px"><button class="btn accent" onclick="backupTraining()">💾 Бэкап</button><button class="btn danger" onclick="exportLogs()">📋 Логи</button></div><div id="exportStatus" style="margin-top:10px;font-size:11px;color:var(--dim)"></div></div>
 </div>
 <script>
-// === ПАТЧ ПАРТНЕРКИ ===
-const urlParams = new URLSearchParams(window.location.search);
-const refCode = urlParams.get('ref');
-if (refCode) localStorage.setItem('evo_ref', refCode);
-
-// === ОПЛАТА ===
-async function startPayment(tier) {
-  const prices = { STD: 14900, BIZ: 59900, OEM: 250000 };
-  const email = prompt('Введите ваш Email для чека:');
-  if (!email) return;
-  
-  try {
-    const ref = localStorage.getItem('evo_ref') || 'DIRECT';
-    const res = await fetch(`/api/pay?amount=${prices[tier]}&description=${tier}&ref=${ref}&email=${email}`);
-    const data = await res.json();
-    if(data.redirectUrl) window.location.href = data.redirectUrl;
-  } catch (e) { alert('Ошибка соединения с сервером оплаты'); }
-}
-
 async function parseFile(f) {
   const ext = f.name.split('.').pop().toLowerCase();
   try {
@@ -102,7 +82,15 @@ window.onload = function () {
   try { hist = JSON.parse(localStorage.getItem('evo_hist') || '[]'); renderHist(); } catch (e) { }
 };
 
-async function analyze() { const t = document.getElementById('doc').value.trim(); if (!t) return showToast('⚠️ Введите текст', 'warn'); try { const r = EvoAgentCore.classify(t); currentResult = r; const pc = { 'низкий': 'low', 'средний': 'med', 'высокий': 'high', 'критический': 'cr' }[r.prio] || 'med'; const conf = (r.conf * 100).toFixed(1); const sc = r.sentiment === 'позитивный' ? '#39ff14' : (r.sentiment === 'негативный' ? '#ff4444' : '#ffaa00'); document.getElementById('out').innerHTML = `<div class="dec"><span class="tag type">📋 ${r.type.toUpperCase()}</span><span class="tag ${pc}">⚡ ${r.prio.toUpperCase()}</span><span class="tag route">📤 → ${r.route}</span><span class="tag sentiment" style="border-color:${sc}">💬 ${r.sentiment.toUpperCase()}</span><div class="raz">Уверенность: <b style="color:var(--green)">${conf}%</b></div></div>`; let ph = '<div style="margin-top:8px;font-size:10px;"><div style="color:var(--border);margin-bottom:4px;">📊 Топ типы:</div>'; const tt = Object.keys(r.allScores.t).sort((a, b) => r.allScores.t[b] - r.allScores.t[a]).slice(0, 3); tt.forEach(k => { const p = (r.allScores.t[k] || 0) * 100; ph += `<div>${k} <span style="color:var(--green)">${p.toFixed(1)}%</span><div class="prob-bar"><div class="prob-fill" style="width:${p}%"></div></div></div>`; }); ph += '</div>'; document.getElementById('probs').innerHTML = ph; document.getElementById('probs').style.display = 'block'; document.getElementById('fbRow').style.display = 'flex'; hist.unshift({ text: t.substring(0, 80), type: r.type, prio: r.prio, route: r.route, sentiment: r.sentiment, time: new Date().toLocaleTimeString() }); renderHist(); saveHist(); showToast('✅ Анализ завершён', 'ok'); } catch (e) { logError('analyze', e); showToast('❌ Ошибка анализа', 'err'); } }
+async function analyze() { const t = document.getElementById('doc').value.trim(); if (!t) return showToast('⚠️ Введите текст', 'warn'); try { const r = EvoAgentCore.classify(t); currentResult = r; const pc = { 'низкий': 'low', 'средний': 'med', 'высокий': 'high', 'критический': 'cr' }[r.prio] || 'med'; const conf = (r.conf * 100).toFixed(1); const sc = r.sentiment === 'позитивный' ? '#39ff14' : (r.sentiment === 'негативный' ? '#ff4444' : '#ffaa00'); document.getElementById('out').innerHTML = `<div class="dec"><span class="tag type">📋 ${r.type.toUpperCase()}</span><span class="tag ${pc}">⚡ ${r.prio.toUpperCase()}</span><span class="tag route">📤 → ${r.route}</span><span class="tag sentiment" style="border-color:${sc}">💬 ${r.sentiment.toUpperCase()}</span><div class="raz">Уверенность: <b style="color:var(--green)">${conf}%</b></div></div>`; 
+  // ✅ ИСПРАВЛЕНИЕ ПРОЦЕНТОВ (нормализация голосов)
+  let ph = '<div style="margin-top:8px;font-size:10px;"><div style="color:var(--border);margin-bottom:4px;">📊 Топ типы:</div>';
+  const scores = r.allScores.t;
+  const total = Object.values(scores).reduce((a,b)=>a+b, 1);
+  const top = Object.keys(scores).sort((a,b)=>scores[b]-scores[a]).slice(0,3);
+  top.forEach(k=>{ const p = ((scores[k]||0)/total)*100; ph+=`<div>${k} <span style="color:var(--green)">${p.toFixed(1)}%</span><div class="prob-bar"><div class="prob-fill" style="width:${p}%"></div></div></div>`; });
+  ph += '</div>'; document.getElementById('probs').innerHTML = ph; 
+  document.getElementById('probs').style.display = 'block'; document.getElementById('fbRow').style.display = 'flex'; hist.unshift({ text: t.substring(0, 80), type: r.type, prio: r.prio, route: r.route, sentiment: r.sentiment, time: new Date().toLocaleTimeString() }); renderHist(); saveHist(); showToast('✅ Анализ завершён', 'ok'); } catch (e) { logError('analyze', e); showToast('❌ Ошибка анализа', 'err'); } }
 function feedback(ok) { const l = hist[0]; if (!l) return; try { if (ok) { EvoAgentCore.addTraining({ f: [], y: l.type, p: l.prio, r: l.route, s: l.sentiment || 'нейтральный' }); showToast('✅ Пример добавлен', 'ok'); } else { const idx = parseInt(document.getElementById('correctClass').value); const all = ['договор', 'счёт', 'жалоба', 'заявление', 'запрос', 'письмо', 'акт', 'накладная', 'низкий', 'средний', 'высокий', 'критический', 'Бухгалтерия', 'Юр. отдел', 'Кадры', 'Руководство', 'ИТ-отдел', 'Продажи', 'Канцелярия', 'Склад', 'СБ', 'позитивный', 'нейтральный', 'негативный']; const lb = all[idx]; if (['договор', 'счёт', 'жалоба', 'заявление', 'запрос', 'письмо', 'акт', 'накладная'].includes(lb)) l.type = lb; else if (['низкий', 'средний', 'высокий', 'критический'].includes(lb)) l.prio = lb; else if (['Бухгалтерия', 'Юр. отдел', 'Кадры', 'Руководство', 'ИТ-отдел', 'Продажи', 'Канцелярия', 'Склад', 'СБ'].includes(lb)) l.route = lb; else l.sentiment = lb; EvoAgentCore.addTraining({ f: [], y: l.type, p: l.prio, r: l.route, s: l.sentiment || 'нейтральный' }); showToast('✏️ Исправлено', 'ok'); } renderHist(); saveHist(); } catch (e) { logError('feedback', e); showToast('❌ Ошибка', 'err'); } }
 function renderHist() { const e = document.getElementById('hist'); let h = ''; for (const i of hist) { const pc = { 'низкий': 'low', 'средний': 'med', 'высокий': 'high', 'критический': 'cr' }[i.prio] || 'med'; h += `<div class="hi"><b>${i.type}</b> · <span class="tag ${pc}">${i.prio}</span> · ${i.time} · 💬 ${i.sentiment || 'нейтральный'}</div>`; } e.innerHTML = h || '<div style="color:var(--dim);text-align:center;padding:16px">История пуста</div>'; }
 function saveHist() { try { localStorage.setItem('evo_hist', JSON.stringify(hist)); } catch (e) { } }
@@ -116,6 +104,15 @@ function exportJSON() { try { const d = hist.map(h => ({ text: h.text, type: h.t
 function exportCSV() { try { const h = 'text,type,prio,route,time\n'; const r = hist.map(x => [x.text, x.type, x.prio, x.route, x.time].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n'); const b = new Blob([h + r], { type: 'text/csv' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'evo.csv'; a.click(); showToast('✅ CSV', 'ok'); } catch (e) { showToast('❌', 'err'); } }
 function backupTraining() { try { const d = { gen: EvoAgentCore.getState().generation, samples: EvoAgentCore.getState().samples, hist, ts: Date.now() }; const b = new Blob([JSON.stringify(d)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'backup.json'; a.click(); showToast('✅ Бэкап', 'ok'); } catch (e) { showToast('❌', 'err'); } }
 function exportLogs() { try { const d = JSON.parse(localStorage.getItem('evo_errors') || '[]'); const b = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'logs.json'; a.click(); showToast('📋 Логи', 'ok'); } catch (e) { showToast('❌', 'err'); } }
+function startPayment(tier) {
+  const prices = { STD: 14900, BIZ: 59900, OEM: 250000 };
+  const email = prompt('Введите ваш Email для чека:');
+  if (!email) return;
+  try {
+    const ref = localStorage.getItem('evo_ref') || 'DIRECT';
+    fetch(`/api/pay?amount=${prices[tier]}&description=${tier}&ref=${ref}&email=${email}`).then(res=>res.json()).then(data=>{if(data.redirectUrl)window.location.href=data.redirectUrl;}).catch(()=>alert('Сервер оплаты не подключен'));
+  } catch (e) { alert('Ошибка соединения'); }
+}
 
 const cv = document.getElementById('bg'), cx = cv.getContext('2d'); let W, H, ms = { x: -999, y: -99 }, pts = []; const PC = 250, CL = ['#00f3ff', '#ff0066', '#ffaa00', '#39ff14']; function rz() { W = cv.width = innerWidth; H = cv.height = innerHeight; } addEventListener('resize', rz); rz(); addEventListener('mousemove', e => { ms.x = e.clientX; ms.y = e.clientY; }); function Pt() { this.x = Math.random() * W; this.y = H + Math.random() * 100; this.vx = (Math.random() - .5) * .5; this.vy = -Math.random() * 2 - .5; this.l = 1; this.d = .003 + Math.random() * .004; this.s = Math.random() * 3 + 1; this.c = CL[Math.floor(Math.random() * CL.length)]; this.f = Math.random() * 6; } Pt.prototype.up = function () { const dx = ms.x - this.x, dy = ms.y - this.y, d = Math.hypot(dx, dy); if (d < 120) { const f = 1 - d / 120; this.vx += dx / d * f * .8; this.vy += dy / d * f * .8; } this.x += this.vx; this.y += this.vy; this.vy *= .99; this.vx *= .98; this.l -= this.d; this.f += .1; if (this.l <= 0) { this.x = Math.random() * W; this.y = H + Math.random() * 100; this.vx = (Math.random() - .5) * .5; this.vy = -Math.random() * 2 - .5; this.l = 1; } }; Pt.prototype.dr = function () { cx.globalCompositeOperation = 'lighter'; cx.shadowBlur = 10; cx.shadowColor = this.c; cx.beginPath(); cx.arc(this.x, this.y, this.s * (.8 + Math.sin(this.f) * .2), 0, Math.PI * 2); cx.fillStyle = this.c + Math.floor(this.l * 255).toString(16).padStart(2, '0'); cx.fill(); cx.shadowBlur = 0; cx.globalCompositeOperation = 'source-over'; }; for (let i = 0; i < PC; i++) pts.push(new Pt()); function an() { cx.clearRect(0, 0, W, H); for (const p of pts) { p.up(); p.dr(); } requestAnimationFrame(an); } an(); addEventListener('visibilitychange', () => { if (document.hidden) pts = []; else for (let i = 0; i < PC; i++) pts.push(new Pt()); });
 </script>
