@@ -1,179 +1,181 @@
-'use strict';
+(function(root, factory) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory();
+  else root.EvoAgent = factory();
+})(typeof window !== 'undefined' ? window : global, function() {
+  'use strict';
 
-const fs = require('fs');
-const path = require('path');
-const { extract, NF } = require('./features');
+  const TYPES = ['договор','счёт','жалоба','заявление','запрос','письмо','акт','накладная'];
+  const PRIOS = ['низкий','средний','высокий','критический'];
+  const ROUTES = ['Бухгалтерия','Юр. отдел','Кадры','Руководство','ИТ-отдел','Продажи','Канцелярия','Склад','СБ'];
+  const SENTIMENTS = ['позитивный','нейтральный','негативный'];
+  const NO = 37, NF = 66, NH = 32;
 
-const TYPES = ['договор','счёт','жалоба','заявление','запрос','письмо','акт','накладная'];
-const PRIOS = ['низкий','средний','высокий','критический'];
-const ROUTES = ['Бухгалтерия','Юр. отдел','Кадры','Руководство','ИТ-отдел','Продажи','Канцелярия','Склад','СБ'];
-const SENTIMENTS = ['позитивный','нейтральный','негативный'];
-const NO = TYPES.length + PRIOS.length + ROUTES.length + SENTIMENTS.length;
-const NH = 32;
+  // Веса встраиваются при сборке (scripts/build-client.js)
+  const WEIGHTS = __WEIGHTS_PLACEHOLDER__;
+  const { W1, b1, W2, b2 } = WEIGHTS;
 
-const BUILTIN = [
-  {t:'ДОГОВОР ПОСТАВКИ №123\nМежду ООО «Альфа» и ООО «Бета» заключён договор. Стороны обязуются поставить товар. Ответственность за нарушение обязательств. Подписи сторон, печати.', y:'договор', p:'средний', r:'Юр. отдел', s:'нейтральный'},
-  {t:'КОНТРАКТ №45 на оказание услуг. Исполнитель и Заказчик согласовали условия. Срок 90 дней. Ответственность и порядок расчётов. Подписи.', y:'договор', p:'низкий', r:'Руководство', s:'нейтральный'},
-  {t:'СОГЛАШЕНИЕ о конфиденциальности. Стороны не разглашают данные. Штраф за нарушение. Подписаны директорами.', y:'договор', p:'высокий', r:'Юр. отдел', s:'нейтральный'},
-  {t:'ДОГОВОР АРЕНДЫ №12.\nАрендодатель передаёт помещение 50 кв.м. Арендатор обязуется вносить ежемесячную плату 45 000 руб. до 5 числа на р/с 40702... Договор действует 1 год. Не является счётом на оплату.', y:'договор', p:'средний', r:'Бухгалтерия', s:'нейтральный'},
-  {t:'СЧЁТ №456 от 01.09.2026\nООО «ТехноСервис», ИНН 7701234567. Товар: серверы 2 шт. Сумма 1 250 000 руб., НДС 20%. Оплата на р/с 40702810.', y:'счёт', p:'высокий', r:'Бухгалтерия', s:'нейтральный'},
-  {t:'СЧЕТ-ФАКТУРА №789. Продавец ООО «Материалы». Цемент 100 мешков. НДС 20%. Всего к оплате 54 000 руб. Р/с в Сбербанке.', y:'счёт', p:'средний', r:'Бухгалтерия', s:'нейтральный'},
-  {t:'ПРЕТЕНЗИЯ. Нарушение сроков. Требуем неустойку 0.1% в день. Иначе арбитражный суд. Ущерб 450 000 руб.', y:'жалоба', p:'критический', r:'Юр. отдел', s:'негативный'},
-  {t:'ЖАЛОБА на качество. Требую возместить ущерб 50 000 руб. Обращусь в прокуратуру.', y:'жалоба', p:'высокий', r:'Руководство', s:'негативный'},
-  {t:'ЗАЯВЛЕНИЕ. Прошу отпуск с 15.09.2026. Согласовать с руководителем, передать в кадры.', y:'заявление', p:'низкий', r:'Кадры', s:'нейтральный'},
-  {t:'ЗАЯВЛЕНИЕ об увольнении. Прошу уволить с 01.10.2026. Отработаю 2 недели. Трудовую книжку.', y:'заявление', p:'средний', r:'Кадры', s:'нейтральный'},
-  {t:'ЗАЯВЛЕНИЕ на приём. Прошу на должность инженера ИТ. Резюме прилагаю. Готов с 01.10.', y:'заявление', p:'низкий', r:'Кадры', s:'позитивный'},
-  {t:'ЗАПРОС информации. Данные о задолженности контрагента для аудита. Срок до 10.09.', y:'запрос', p:'средний', r:'Бухгалтерия', s:'нейтральный'},
-  {t:'СЛУЖЕБНАЯ ЗАПИСКА. Средства на 10 ноутбуков. Устаревание оборудования.', y:'запрос', p:'высокий', r:'Руководство', s:'нейтральный'},
-  {t:'СОПРОВОДИТЕЛЬНОЕ ПИСЬМО. Направляем документы по договору №67. Просим подписать за 5 дней.', y:'письмо', p:'низкий', r:'Канцелярия', s:'нейтральный'},
-  {t:'УВЕДОМЛЕНИЕ. Изменение реквизитов с 01.10. Новый р/с. Учтите при оплате.', y:'письмо', p:'средний', r:'Бухгалтерия', s:'нейтральный'},
-  {t:'БЛАГОДАРСТВЕННОЕ ПИСЬМО. Признательность за сотрудничество. Надеемся на партнёрство.', y:'письмо', p:'низкий', r:'Руководство', s:'позитивный'},
-  {t:'АКТ выполненных работ №34. Подрядчик ООО «РемонтПро». Объём 450 кв.м. Претензий нет. Подписи.', y:'акт', p:'средний', r:'Бухгалтерия', s:'нейтральный'},
-  {t:'Акт ПРИЁМКИ. Комиссия приняла сервер Dell. Комплектность полная. Замечаний нет.', y:'акт', p:'средний', r:'ИТ-отдел', s:'позитивный'},
-  {t:'ТОВАРНАЯ НАКЛАДНАЯ №567. Поставщик ООО «ОптТорг». Бумага 200 пачек, тонер 50. Итого 130 000 руб.', y:'накладная', p:'средний', r:'Склад', s:'нейтральный'},
-  {t:'НАКЛАДНАЯ НА ОТПУСК. Грузополучатель филиал №3. Стройматериалы 2.5 тонны, 12 мест. Склад №1.', y:'накладная', p:'средний', r:'Склад', s:'нейтральный'},
-  {t:'КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ №11.\nООО «Софт» предлагает: лицензия 1С - 5 шт. по 85 000 руб. Действует 30 дней. Счёт будет выставлен после согласования. Не является договором или счётом.', y:'договор', p:'низкий', r:'Продажи', s:'нейтральный'},
-  {t:'АКТ СВЕРКИ ВЗАИМОРАСЧЁТОВ за Q3.\nПо договору №44. Задолженность ООО «Вектор» составляет 320 000 руб. Просим подтвердить или указать расхождения. Не требует оплаты.', y:'акт', p:'средний', r:'Бухгалтерия', s:'нейтральный'},
-  {t:'СЧЁТ НА ОПЛАТУ №99.\nВ рамках договора №12 от 10.01.2026. Услуги хостинга, 12 мес. Сумма 144 000 руб., НДС 0%. Просим оплатить до 20.09. Подпись директора.', y:'счёт', p:'высокий', r:'Бухгалтерия', s:'нейтральный'},
-  {t:'УНИВЕРСАЛЬНЫЙ ПЕРЕДАТОЧНЫЙ ДОКУМЕНТ №205.\nОтгрузочная накладная и акт приёмки в одном лице. Товар: кабель 500 м. Стоимость 450 000 руб. Отгружено со склада №2. Принято без замечаний.', y:'накладная', p:'средний', r:'Склад', s:'нейтральный'},
-  {t:'ДОГОВОР ПОДРЯДА №789. Подрядчик обязуется выполнить работы по ремонту офиса. Заказчик оплачивает после приёмки. Срок 30 дней.', y:'договор', p:'средний', r:'Юр. отдел', s:'нейтральный'},
-  {t:'СЧЁТ №101 от 05.09.2026. ООО «ОфисПлюс». Канцтовары на сумму 15 000 руб. Оплата в течение 5 дней.', y:'счёт', p:'низкий', r:'Бухгалтерия', s:'нейтральный'},
-  {t:'ПРЕТЕНЗИЯ №45. Непоставка товара в срок. Требуем возврата аванса 200 000 руб. Иначе суд.', y:'жалоба', p:'критический', r:'Юр. отдел', s:'негативный'},
-  {t:'ЗАЯВЛЕНИЕ на командировку. Прошу направить в Москву с 10.09 по 15.09.2026. Цель: переговоры.', y:'заявление', p:'низкий', r:'Руководство', s:'нейтральный'},
-  {t:'ЗАПРОС коммерческого предложения. Просим выслать КП на поставку оборудования до 15.09.', y:'запрос', p:'средний', r:'Продажи', s:'нейтральный'},
-  {t:'ИНФОРМАЦИОННОЕ ПИСЬМО. Уведомляем о смене адреса с 01.10.2026. Новый адрес: ул. Ленина, 10.', y:'письмо', p:'низкий', r:'Канцелярия', s:'нейтральный'},
-  {t:'АКТ ДЕФЕКТОВЕДМОСТИ. Выявлены недостатки оборудования. Требуется ремонт. Комиссия.', y:'акт', p:'высокий', r:'ИТ-отдел', s:'негативный'},
-  {t:'НАКЛАДНАЯ №890. Получено от ООО «Строй». Кирпич 5000 шт. Склад №3. Принято.', y:'накладная', p:'низкий', r:'Склад', s:'нейтральный'},
-  {t:'СЛУЖЕБНАЯ ЗАПИСКА о нарушении. Сотрудник Иванов опоздал на работу 3 раза. Прошу применить взыскание.', y:'запрос', p:'средний', r:'Кадры', s:'негативный'},
-  {t:'ДОГОВОР ЛИЗИНГА №321. Лизингодатель передаёт автомобиль. Лизингополучатель платит ежемесячно 50 000 руб.', y:'договор', p:'высокий', r:'Бухгалтерия', s:'нейтральный'},
-  {t:'СЧЁТ-ФАКТУРА №234. Услуги связи за август. Сумма 8 500 руб. НДС 20%.', y:'счёт', p:'низкий', r:'Бухгалтерия', s:'нейтральный'},
-  {t:'ЖАЛОБА клиента. Плохое обслуживание. Требую компенсацию 10 000 руб.', y:'жалоба', p:'высокий', r:'Руководство', s:'негативный'},
-  {t:'ЗАЯВЛЕНИЕ на больничный. Прошу оформить листок нетрудоспособности с 01.09.2026.', y:'заявление', p:'низкий', r:'Кадры', s:'нейтральный'},
-  {t:'ЗАПРОС на доступ. Прошу предоставить доступ к базе данных для аудита.', y:'запрос', p:'средний', r:'ИТ-отдел', s:'нейтральный'},
-  {t:'РЕКОМЕНДАТЕЛЬНОЕ ПИСЬМО. Иванов И.И. работал в компании 5 лет. Рекомендуем как надёжного сотрудника.', y:'письмо', p:'низкий', r:'Кадры', s:'позитивный'},
-  {t:'АКТ ПРИЁМКИ-ПЕРЕДАЧИ. Передан автомобиль Toyota. Пробег 50 000 км. Состояние удовлетворительное.', y:'акт', p:'средний', r:'Канцелярия', s:'нейтральный'},
-  {t:'НАКЛАДНАЯ НА ВОЗВРАТ. Возврат брака 50 шт. Поставщик ООО «Техно». Склад №1.', y:'накладная', p:'средний', r:'Склад', s:'негативный'}
-];
+  // LEX, BIGRAMS, POS_WORDS — из core/features.js
+  const LEX = [
+    {w:['договор','контракт','соглашение','обязательств','сторона','подряд','поставк','услуг','исполнител','заказчик']},
+    {w:['счёт','оплат','налог','ндс','руб','коп','сумм','цен','стоимост','тариф','платёж']},
+    {w:['инн','кпп','р/с','расчётн','банк','бик','огрн','реквизит','корреспондент']},
+    {w:['жалоб','претензи','нарушен','недоволен','требую','возмест','ущерб','бездействи','рекламац']},
+    {w:['заявлен','прошу','увольн','отпуск','приём','перевод','должност','зарплат','кадр','стаж']},
+    {w:['запрос','предостав','сообщите','уточните','информац','данны','сведени','справк']},
+    {w:['письм','уведомл','сообщаем','направляем','информиру','уважени','прилагаем','доводим']},
+    {w:['акт','выполн','приёмк','передач','комисси','списани','инвентар','дефект']},
+    {w:['накладн','товар','груз','склад','отгрузк','количеств','вес','мест','парти']},
+    {w:['срочн','немедл','важн','критич','авари','сбой','экстрен','безотлагат']},
+    {w:['руковод','директор','начальник','согласован','утвержд','приказ','распоряжен','генеральн']},
+    {w:['бухгалт','финанс','бюджет','расход','приход','касс','аванс','дебет','кредит']},
+    {w:['юрид','иск','суд','правов','арбитраж','закон','стать','кодекс','норматив']},
+    {w:['сервер','програм','доступ','пароль','систем','баз данн','сеть','оборудован','настройк']},
+    {w:['продаж','клиент','заказ','менеджер','сделк','коммерческ','предложен','скидк']}
+  ];
 
-function initWeights() {
-  const s1 = Math.sqrt(2 / NF), s2 = Math.sqrt(2 / NH);
-  return {
-    W1: Array.from({length: NH}, () => Array.from({length: NF}, () => (Math.random() * 2 - 1) * s1)),
-    b1: new Array(NH).fill(0),
-    W2: Array.from({length: NO}, () => Array.from({length: NH}, () => (Math.random() * 2 - 1) * s2)),
-    b2: new Array(NO).fill(0)
-  };
-}
+  const BIGRAMS = ['до','сч','ак','на','за','пи','пр','от','по','об','вы','пе','ус','ра','та','ко','ин','ре'];
+  const POS_WORDS = ['договор','счёт','жалоба','заявление','запрос','письмо','акт','накладная','претензия','уведомление','соглашение','контракт','инн','руб','подпис','печать','прошу','требуем','сообщаем','направляем'];
 
-function forward(W1, b1, W2, b2, feat, dropout) {
-  const hid = new Float64Array(NH);
-  const mask = dropout ? new Float64Array(NH) : null;
-  for (let h = 0; h < NH; h++) {
-    let s = b1[h];
-    for (let j = 0; j < NF; j++) s += W1[h][j] * feat[j];
-    hid[h] = Math.tanh(s);
-    if (dropout) {
-      if (Math.random() < 0.3) { hid[h] = 0; mask[h] = 0; }
-      else mask[h] = 1;
+  const FEAT_NAMES = [
+    ...LEX.map(g => `Лексика: ${g.w[0]}…`),
+    'Длина текста','Кол-во предложений','Плотность цифр','Плотность CAPS',
+    'Наличие даты','Наличие email','Сумма (руб)','Нумерованный список',
+    'Подпись/печать','Разнообразие слов','Форма организации','Номер (№)','Ср. длина предложения',
+    ...BIGRAMS.map(b => `Биграма «${b}»`),
+    ...POS_WORDS.map(w => `Позиция: «${w}»`)
+  ];
+
+  function extract(text) {
+    if (typeof text !== 'string') throw new TypeError('Text must be string');
+    const lo = text.toLowerCase();
+    const words = lo.split(/\s+/).filter(w => w.length > 0);
+    const f = new Float64Array(NF);
+    let idx = 0;
+
+    for (const g of LEX) {
+      let mx = 0;
+      for (const w of g.w) {
+        const m = lo.match(new RegExp(w, 'g'));
+        if (m) mx = Math.max(mx, Math.min(m.length / 3, 1));
+      }
+      f[idx++] = mx;
     }
-  }
-  const out = new Float64Array(NO);
-  for (let o = 0; o < NO; o++) {
-    let s = b2[o];
-    for (let h = 0; h < NH; h++) s += W2[o][h] * hid[h];
-    out[o] = s;
-  }
-  return { hid, out, mask };
-}
 
-function softmax(a, from, to) {
-  let mx = -Infinity;
-  for (let i = from; i < to; i++) if (a[i] > mx) mx = a[i];
-  if (!isFinite(mx)) mx = 0;
-  let s = 0; const r = [];
-  for (let i = from; i < to; i++) {
-    const e = Math.exp(Math.min(a[i] - mx, 50));
-    r.push(e); s += e;
+    const sents = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const digs = (lo.match(/\d/g) || []).length;
+    const caps = (text.match(/[А-ЯA-Z]{2,}/g) || []).length;
+    f[idx++] = Math.min(Math.log(text.length + 1) / 10, 1);
+    f[idx++] = Math.min(sents.length / 10, 1);
+    f[idx++] = Math.min(digs / (words.length + 1) * 5, 1);
+    f[idx++] = Math.min(caps / (words.length + 1) * 5, 1);
+    f[idx++] = /\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/.test(text) ? 1 : 0;
+    f[idx++] = /[a-z0-9._]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(text) ? 1 : 0;
+    f[idx++] = /\d[\d\s]*\s*(руб|₽|тыс|млн)/i.test(text) ? 1 : 0;
+    f[idx++] = /^\s*\d+[.)]\s/m.test(text) ? 1 : 0;
+    f[idx++] = /подпис|м\.п\.|печать/i.test(lo) ? 1 : 0;
+    const unique = new Set(words).size;
+    f[idx++] = Math.min((words.length > 0 ? unique / words.length : 0) * 2, 1);
+    f[idx++] = /ооо|ао |зао|ип |пао/i.test(text) ? 1 : 0;
+    f[idx++] = /№|номер/i.test(lo) ? 1 : 0;
+    f[idx++] = Math.min((sents.length > 0 ? words.length / sents.length : 0) / 30, 1);
+
+    for (const bg of BIGRAMS) {
+      const c = (lo.match(new RegExp(bg, 'g')) || []).length;
+      f[idx++] = Math.min(c / 5, 1);
+    }
+
+    const first100 = lo.substring(0, 100);
+    const last100 = lo.substring(Math.max(0, lo.length - 100));
+    for (const pw of POS_WORDS) {
+      const fp = first100.indexOf(pw) !== -1 ? 1 : 0;
+      const lp = last100.indexOf(pw) !== -1 ? 1 : 0;
+      f[idx++] = (fp + lp) / 2;
+    }
+
+    return Array.from(f);
   }
-  if (s === 0 || !isFinite(s)) return r.map(() => 1 / r.length);
-  return r.map(v => v / s);
-}
 
-function backward(W1, b1, W2, b2, acts, target, lr) {
-  const { feat, hid, out, mask } = acts;
-  const l2 = 0.0001;
-  const tS = softmax(out, 0, TYPES.length);
-  const pS = softmax(out, TYPES.length, TYPES.length + PRIOS.length);
-  const rS = softmax(out, TYPES.length + PRIOS.length, TYPES.length + PRIOS.length + ROUTES.length);
-  const sS = softmax(out, TYPES.length + PRIOS.length + ROUTES.length, NO);
-  const tI = TYPES.indexOf(target.y), pI = PRIOS.indexOf(target.p);
-  const rI = ROUTES.indexOf(target.r), sI = SENTIMENTS.indexOf(target.s);
-  const dO = new Float64Array(NO);
-  for (let i = 0; i < TYPES.length; i++) dO[i] = (i === tI ? tS[i] - 1 : tS[i]);
-  for (let i = 0; i < PRIOS.length; i++) dO[TYPES.length + i] = (i === pI ? pS[i] - 1 : pS[i]) * 0.5;
-  for (let i = 0; i < ROUTES.length; i++) dO[TYPES.length + PRIOS.length + i] = (i === rI ? rS[i] - 1 : rS[i]) * 0.5;
-  for (let i = 0; i < SENTIMENTS.length; i++) dO[TYPES.length + PRIOS.length + ROUTES.length + i] = (i === sI ? sS[i] - 1 : sS[i]) * 0.3;
-
-  const dH = new Float64Array(NH);
-  for (let o = 0; o < NO; o++) {
+  function forward(feat) {
+    const hid = new Float64Array(NH);
     for (let h = 0; h < NH; h++) {
-      const g = dO[o] * hid[h] + l2 * W2[o][h];
-      W2[o][h] -= lr * g;
-      dH[h] += dO[o] * W2[o][h];
+      let s = b1[h];
+      for (let j = 0; j < NF; j++) s += W1[h][j] * feat[j];
+      hid[h] = Math.tanh(s);
     }
-    b2[o] -= lr * dO[o];
-  }
-  for (let h = 0; h < NH; h++) {
-    if (mask && mask[h] === 0) continue;
-    const dA = dH[h] * (1 - hid[h] * hid[h]);
-    for (let j = 0; j < NF; j++) {
-      const g = dA * feat[j] + l2 * W1[h][j];
-      W1[h][j] -= lr * g;
+    const out = new Float64Array(NO);
+    for (let o = 0; o < NO; o++) {
+      let s = b2[o];
+      for (let h = 0; h < NH; h++) s += W2[o][h] * hid[h];
+      out[o] = s;
     }
-    b1[h] -= lr * dA;
-  }
-}
-
-function train() {
-  console.log('🧠 Обучение модели...');
-  const data = BUILTIN.map(d => ({
-    f: extract(d.t), y: d.y, p: d.p, r: d.r, s: d.s || 'нейтральный'
-  }));
-
-  let { W1, b1, W2, b2 } = initWeights();
-  const epochs = 800, baseLr = 0.005;
-
-  for (let ep = 0; ep < epochs; ep++) {
-    const lr = baseLr * Math.max(0.05, 1 - ep / epochs);
-    const sh = [...data].sort(() => Math.random() - 0.5);
-    for (const d of sh) {
-      const nf = d.f.map(v => Math.max(0, Math.min(1, v + (Math.random() - 0.5) * 0.05)));
-      const acts = forward(W1, b1, W2, b2, nf, true);
-      backward(W1, b1, W2, b2, acts, d, lr);
-    }
+    return { hid, out };
   }
 
-  let correct = 0;
-  for (const d of BUILTIN) {
-    const acts = forward(W1, b1, W2, b2, extract(d.t), false);
-    const tS = softmax(acts.out, 0, TYPES.length);
+  function softmax(a, from, to) {
+    let mx = -Infinity;
+    for (let i = from; i < to; i++) if (a[i] > mx) mx = a[i];
+    if (!isFinite(mx)) mx = 0;
+    let s = 0; const r = [];
+    for (let i = from; i < to; i++) {
+      const e = Math.exp(Math.min(a[i] - mx, 50));
+      r.push(e); s += e;
+    }
+    if (s === 0 || !isFinite(s)) return r.map(() => 1 / r.length);
+    return r.map(v => v / s);
+  }
+
+  function classify(text) {
+    const feat = extract(text);
+    const { out } = forward(feat);
+    const tS = softmax(out, 0, TYPES.length);
+    const pS = softmax(out, TYPES.length, TYPES.length + PRIOS.length);
+    const rS = softmax(out, TYPES.length + PRIOS.length, TYPES.length + PRIOS.length + ROUTES.length);
+    const sS = softmax(out, TYPES.length + PRIOS.length + ROUTES.length, NO);
     const mi = a => { let m = 0; for (let i = 1; i < a.length; i++) if (a[i] > a[m]) m = i; return m; };
-    if (TYPES[mi(tS)] === d.y) correct++;
+    const sorted = [...tS].sort((a, b) => b - a);
+    const conf = isFinite(sorted[0] - sorted[1]) && sorted[0] - sorted[1] > 0 ? sorted[0] - sorted[1] : 0;
+    return {
+      type: TYPES[mi(tS)],
+      prio: PRIOS[mi(pS)],
+      route: ROUTES[mi(rS)],
+      sentiment: SENTIMENTS[mi(sS)],
+      confidence: +conf.toFixed(4),
+      scores: { types: tS, prios: pS, routes: rS, sentiments: sS }
+    };
   }
-  const acc = correct / BUILTIN.length;
-  console.log(`✅ Точность: ${(acc * 100).toFixed(1)}%`);
 
-  return {
-    W1, b1: Array.from(b1), W2, b2: Array.from(b2),
-    accuracy: acc, trainedAt: new Date().toISOString()
-  };
-}
+  function explain(text) {
+    const feat = extract(text);
+    const pred = classify(text);
+    const lo = text.toLowerCase();
+    const reasons = [];
 
-if (require.main === module) {
-  const weights = train();
-  const outPath = path.join(__dirname, 'weights.json');
-  fs.writeFileSync(outPath, JSON.stringify(weights, null, 2));
-  console.log(`💾 Веса сохранены: ${outPath}`);
-}
+    for (const g of LEX) {
+      for (const w of g.w) {
+        if (lo.includes(w)) {
+          reasons.push(`🔤 Найдено: «${w}» → лексический маркер`);
+          break;
+        }
+      }
+    }
+    if (/\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/.test(text)) reasons.push('📅 Обнаружена дата');
+    if (/№|номер/i.test(lo)) reasons.push('🔢 Есть номер документа');
+    if (/руб|₽|тыс|млн/i.test(text)) reasons.push('💰 Указана сумма');
+    if (/подпис|м\.п\.|печать/i.test(lo)) reasons.push('✍️ Упоминание подписи/печати');
+    if (/ооо|ао |зао|ип |пао/i.test(text)) reasons.push('🏢 Указана организация');
 
-module.exports = { train, BUILTIN };
+    const imp = [];
+    for (let j = 0; j < NF; j++) {
+      let v = 0;
+      for (let h = 0; h < NH; h++) v += Math.abs(W1[h][j] * feat[j]);
+      imp.push({ j, v });
+    }
+    imp.sort((a, b) => b.v - a.v);
+    const top3 = imp.slice(0, 3).map(x => FEAT_NAMES[x.j] || `#${x.j}`).join(', ');
+    reasons.push(`📊 Ключевые факторы: ${top3}`);
+
+    return { prediction: pred, reasons: reasons.slice(0, 10) };
+  }
+
+  return { classify, explain, extract, TYPES, PRIOS, ROUTES, SENTIMENTS, NF, NH, NO, FEAT_NAMES };
+});
