@@ -1,122 +1,154 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=1200"><title>ЭвоАгент v5 Pro</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>EvoAgent STD v7.1</title>
+<script src="license-check.js"></script>
 <script src="core.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 <style>
+/* Стили из v6.1 — без изменений */
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700&display=swap');
 :root{--bg:#05050a;--panel:#0c101d;--border:#00f3ff;--accent:#ff0066;--amber:#ffaa00;--green:#39ff14;--text:#e0e6f0;--dim:#4a5570;--err:#ff4444}
-*{box-sizing:border-box;margin:0;padding:0}body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monospace;min-height:100vh;overflow-x:hidden}
-#bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}.scanlines{position:fixed;top:0;left:0;width:100%;height:100%;background:repeating-linear-gradient(0deg,transparent 0px,transparent 2px,rgba(0,0,0,0.15) 3px);pointer-events:none;z-index:1}
-.container{position:relative;z-index:2;max-width:1400px;margin:0 auto;padding:20px}header{text-align:center;margin-bottom:20px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monospace;min-height:100vh;overflow-x:hidden}
+.container{max-width:1400px;margin:0 auto;padding:20px}
+header{text-align:center;margin-bottom:20px}
 h1{font-family:'Orbitron',sans-serif;font-size:28px;background:linear-gradient(90deg,var(--border),var(--accent),var(--amber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px}
-.sub{color:var(--dim);font-size:12px;margin-top:4px;letter-spacing:1px}.grid{display:grid;grid-template-columns:1.2fr 1fr 320px;gap:16px}
-@media(max-width:1100px){.grid{grid-template-columns:1fr}}.panel{background:rgba(12,16,29,0.85);backdrop-filter:blur(10px);border:1px solid rgba(0,243,255,0.2);border-radius:12px;padding:16px;box-shadow:0 0 8px var(--border)}
-.panel h2{font-family:'Orbitron',sans-serif;font-size:13px;color:var(--border);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:8px}.panel h2::before{content:'▸';color:var(--accent)}
+.sub{color:var(--dim);font-size:12px;margin-top:4px;letter-spacing:1px}
+.grid{display:grid;grid-template-columns:1.2fr 1fr;gap:16px}
+@media(max-width:1100px){.grid{grid-template-columns:1fr}}
+.panel{background:rgba(12,16,29,0.85);backdrop-filter:blur(10px);border:1px solid rgba(0,243,255,0.2);border-radius:12px;padding:16px;box-shadow:0 0 8px var(--border)}
+.panel h2{font-family:'Orbitron',sans-serif;font-size:13px;color:var(--border);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px}
 textarea,input,select{width:100%;background:#080c18;border:1px solid rgba(0,243,255,0.3);color:var(--text);padding:10px;border-radius:6px;font:inherit;font-size:13px;resize:vertical}
-textarea:focus{outline:none;border-color:var(--accent)}textarea{min-height:140px;font-size:14px}.dropzone{border:2px dashed rgba(0,243,255,0.3);padding:16px;text-align:center;color:var(--dim);border-radius:6px;margin-top:8px;cursor:pointer;transition:all .3s}
-.dropzone.over{border-color:var(--green);background:rgba(57,255,20,0.1)}.btn{background:linear-gradient(135deg,rgba(0,243,255,0.15),rgba(0,243,255,0.05));border:1px solid var(--border);color:var(--border);padding:9px 14px;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;transition:all 0.2s;text-transform:uppercase;letter-spacing:1px}
-.btn:hover{background:var(--border);color:var(--bg)}.btn.accent{border-color:var(--accent);color:var(--accent);background:linear-gradient(135deg,rgba(255,0,102,0.15),rgba(255,0,102,0.05))}.btn.accent:hover{background:var(--accent);color:var(--bg)}
-.btn.green{border-color:var(--green);color:var(--green);background:linear-gradient(135deg,rgba(57,255,20,0.1),rgba(57,255,20,0.05))}.btn.green:hover{background:var(--green);color:var(--bg)}.btn.danger{border-color:var(--err);color:var(--err);background:linear-gradient(135deg,rgba(255,68,68,0.15),rgba(255,68,68,0.05))}
-.btn.danger:hover{background:var(--err);color:#fff}.row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.met{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed rgba(74,85,112,0.3);font-size:12px}.met:last-child{border:none}.met .v{color:var(--green);font-weight:600}
-.tag{display:inline-block;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;margin:3px}.tag.type{background:rgba(0,243,255,0.15);color:var(--border);border:1px solid rgba(0,243,255,0.3)}.tag.low{background:rgba(57,255,20,0.15);color:var(--green)}.tag.med{background:rgba(255,170,0,0.15);color:var(--amber)}.tag.high{background:rgba(255,0,102,0.15);color:var(--accent)}.tag.cr{background:rgba(255,0,0,0.2);color:#ff4444}.tag.route{background:rgba(161,140,209,0.15);color:#c9a7eb}.tag.sentiment{background:rgba(255,255,0,0.1);color:#ffff00}
-.dec{background:rgba(8,12,24,0.7);border:1px solid rgba(0,243,255,0.2);border-radius:8px;padding:12px;margin-bottom:10px;position:relative;overflow:hidden}.dec::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:linear-gradient(180deg,var(--border),var(--accent),var(--amber))}.raz{font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5;font-style:italic}
-.tabs{display:flex;gap:0;margin-top:16px;border-bottom:2px solid rgba(0,243,255,0.1)}.tab-btn{padding:10px 18px;background:none;border:none;color:var(--dim);cursor:pointer;font-family:inherit;font-size:12px;text-transform:uppercase;letter-spacing:1px}.tab-btn.active{color:var(--border);border-bottom:2px solid var(--border);background:rgba(0,243,255,0.05)}
-.tab{display:none;padding:12px 0}.tab.active{display:block}.hst{max-height:240px;overflow-y:auto}.hi{background:rgba(8,12,24,0.6);border:1px solid rgba(0,243,255,0.15);border-radius:6px;padding:10px;margin-bottom:8px;font-size:11px}
-::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:rgba(0,0,0,0.3)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}.status{padding:6px 10px;border-radius:4px;font-size:10px;display:inline-block;margin-top:8px}.status.ok{background:rgba(57,255,20,0.15);color:var(--green)}.status.warn{background:rgba(255,170,0,0.15);color:var(--amber)}.status.err{background:rgba(255,68,68,0.15);color:var(--err)}
-.prob-bar{height:4px;background:rgba(255,255,255,0.1);border-radius:2px;margin:2px 0;overflow:hidden}.prob-fill{height:100%;background:linear-gradient(90deg,var(--border),var(--accent));border-radius:2px;transition:width 0.3s}.toast{position:fixed;bottom:20px;right:20px;padding:12px 16px;border-radius:8px;font-size:12px;font-weight:600;z-index:9999;transform:translateY(100px);opacity:0;transition:all 0.3s;pointer-events:none}.toast.show{transform:translateY(0);opacity:1}.toast.ok{background:rgba(57,255,20,0.15);border:1px solid var(--green);color:var(--green)}.toast.err{background:rgba(255,68,68,0.15);border:1px solid var(--err);color:var(--err)}
+textarea{min-height:140px;font-size:14px}
+.btn{background:linear-gradient(135deg,rgba(0,243,255,0.15),rgba(0,243,255,0.05));border:1px solid var(--border);color:var(--border);padding:9px 14px;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;text-transform:uppercase;letter-spacing:1px}
+.btn:hover{background:var(--border);color:var(--bg)}
+.btn.green{border-color:var(--green);color:var(--green)}
+.btn.accent{border-color:var(--accent);color:var(--accent)}
+.row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.tag{display:inline-block;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;margin:3px}
+.tag.type{background:rgba(0,243,255,0.15);color:var(--border);border:1px solid rgba(0,243,255,0.3)}
+.tag.low{background:rgba(57,255,20,0.15);color:var(--green)}
+.tag.med{background:rgba(255,170,0,0.15);color:var(--amber)}
+.tag.high{background:rgba(255,0,102,0.15);color:var(--accent)}
+.tag.cr{background:rgba(255,0,0,0.2);color:#ff4444}
+.tag.route{background:rgba(161,140,209,0.15);color:#c9a7eb}
+.tag.sentiment{background:rgba(255,255,0,0.1);color:#ffff00}
+.dec{background:rgba(8,12,24,0.7);border:1px solid rgba(0,243,255,0.2);border-radius:8px;padding:12px;margin-bottom:10px}
+.raz{font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5;font-style:italic}
+.xai-box{background:rgba(8,12,24,0.7);border:1px solid rgba(255,170,0,0.3);border-radius:8px;padding:12px;margin-top:10px;font-size:11px;line-height:1.6}
+.xai-box h3{color:var(--amber);font-size:12px;margin-bottom:8px}
+.prob-bar{height:4px;background:rgba(255,255,255,0.1);border-radius:2px;margin:2px 0;overflow:hidden}
+.prob-fill{height:100%;background:linear-gradient(90deg,var(--border),var(--accent));border-radius:2px;transition:width 0.3s}
+.toast{position:fixed;bottom:20px;right:20px;padding:12px 16px;border-radius:8px;font-size:12px;font-weight:600;z-index:9999;transform:translateY(100px);opacity:0;transition:all 0.3s}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.ok{background:rgba(57,255,20,0.15);border:1px solid var(--green);color:var(--green)}
+.toast.err{background:rgba(255,68,68,0.15);border:1px solid var(--err);color:var(--err)}
 </style>
 </head>
 <body>
-<canvas id="bg"></canvas><div class="scanlines"></div><div id="toast" class="toast"></div>
-<div class="container"><header><h1>🧬 ЭВОАГЕНТ v5 Pro</h1><div class="sub">IDEAL • ENSEMBLE • OFFLINE • ROYALTY 15%</div></header>
-<div class="grid">
-<div class="panel"><h2>📄 Входящий документ</h2><textarea id="doc" placeholder="Введите текст или перетащите файл... (Ctrl+Enter)"></textarea><div class="dropzone" id="dz">📥 Перетащите сюда .txt .pdf .docx .xlsx</div><div class="row"><button class="btn" onclick="analyze()">🔬 Анализ</button><button class="btn accent" onclick="loadSample(0)">Договор</button><button class="btn accent" onclick="loadSample(1)">Счёт</button><button class="btn green" onclick="loadSample(2)">Жалоба</button></div><div id="status" class="status ok">● Инициализация...</div></div>
-<div class="panel"><h2>🎯 Решение агента</h2><div id="out" style="color:var(--dim);text-align:center;padding:40px 0">Ожидание ввода...</div><div id="probs" style="font-size:10px;color:var(--dim);margin-top:8px;display:none"></div><div class="row" id="fbRow" style="display:none;margin-top:10px"><select id="correctClass" style="flex:1;padding:6px;font-size:11px;background:#080c18;border:1px solid rgba(0,243,255,0.3);color:var(--text);border-radius:4px"></select><button class="btn green" onclick="feedback(true)">✓ Верно</button><button class="btn accent" onclick="feedback(false)">✗ Исправить</button></div></div>
-<div class="panel"><h2>🔐 Покупка лицензии</h2>
-<div class="met"><span>Текущий статус</span><span class="v">Демо-версия</span></div>
-<div class="met"><span>Доступные тарифы</span><span class="v">STD / BIZ / OEM</span></div>
-<div class="row" style="margin-top:8px"><button class="btn" onclick="startPayment('STD')">Купить STD (14900₽)</button></div>
-<div class="row"><button class="btn" onclick="startPayment('BIZ')">Купить BIZ (59900₽)</button></div>
-<div class="row"><button class="btn" onclick="startPayment('OEM')">Купить OEM (250000₽)</button></div>
-</div></div>
-<div class="tabs"><button class="tab-btn active" onclick="tab(0,this)">📜 История</button><button class="tab-btn" onclick="tab(1,this)">📦 Пакетная</button><button class="tab-btn" onclick="tab(2,this)">⚡ Эволюция</button><button class="tab-btn" onclick="tab(3,this)">💾 Экспорт</button></div>
-<div class="tab active" id="tb0"><div class="hst" id="hist"><div style="color:var(--dim);text-align:center;padding:16px">История пуста</div></div></div>
-<div class="tab" id="tb1"><div style="padding:10px"><input type="file" id="batchFiles" multiple accept=".txt,.pdf,.docx,.xlsx" style="margin-bottom:10px"><button class="btn" onclick="processBatch()">🚀 Обработать</button><button class="btn accent" onclick="loadDemoData()" style="margin-left:8px">📦 Демо</button><div id="batchRes" style="margin-top:10px;font-size:11px;color:var(--dim)"></div></div></div>
-<div class="tab" id="tb2"><div class="row" style="margin-bottom:10px"><button class="btn" onclick="evo(1)">⚡ Шаг</button><button class="btn green" onclick="evo(10)">⚡×10</button><button class="btn danger" onclick="resetAll()">↺ Сброс</button></div><div style="font-size:11px;color:var(--dim);line-height:1.6">Нажимайте кнопки после подтверждения решений.</div></div>
-<div class="tab" id="tb3"><div class="row"><button class="btn green" onclick="exportJSON()">📄 JSON</button><button class="btn" onclick="exportCSV()">📊 CSV</button></div><div class="row" style="margin-top:8px"><button class="btn accent" onclick="backupTraining()">💾 Бэкап</button><button class="btn danger" onclick="exportLogs()">📋 Логи</button></div><div id="exportStatus" style="margin-top:10px;font-size:11px;color:var(--dim)"></div></div>
+<div class="container">
+  <header>
+    <h1>🧬 EVOAGENT STD v7.1</h1>
+    <div class="sub">КЛАССИФИКАТОР ДОКУМЕНТОВ • ОФЛАЙН</div>
+  </header>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>📄 Входящий документ</h2>
+      <textarea id="doc" placeholder="Введите текст документа... (Ctrl+Enter для анализа)"></textarea>
+      <div class="row">
+        <button class="btn" onclick="analyze()">🔬 Анализ</button>
+        <button class="btn accent" onclick="loadSample(0)">Договор</button>
+        <button class="btn accent" onclick="loadSample(1)">Счёт</button>
+        <button class="btn green" onclick="loadSample(2)">Жалоба</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>🎯 Решение агента</h2>
+      <div id="out" style="color:var(--dim);text-align:center;padding:40px 0">Ожидание ввода...</div>
+      <div id="probs" style="font-size:10px;color:var(--dim);margin-top:8px;display:none"></div>
+      <div id="xaiBox" class="xai-box" style="display:none"></div>
+    </div>
+  </div>
 </div>
+
+<div id="toast" class="toast"></div>
+
 <script>
-async function parseFile(f) {
-  const ext = f.name.split('.').pop().toLowerCase();
-  try {
-    if (ext === 'txt' || ext === 'json') return await f.text();
-    if (ext === 'pdf' && typeof pdfjsLib === 'undefined') throw new Error('PDF lib not loaded');
-    if (ext === 'docx' && typeof mammoth === 'undefined') throw new Error('DOCX lib not loaded');
-    if (ext === 'xlsx' && typeof XLSX === 'undefined') throw new Error('XLSX lib not loaded');
-    const buf = await f.arrayBuffer();
-    if (ext === 'pdf') { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; const p = await pdfjsLib.getDocument({ data: buf }).promise; let t = ''; for (let i = 1; i <= p.numPages; i++) t += await p.getPage(i).then(pg => pg.getTextContent().then(c => c.items.map(x => x.str).join(' '))) + '\n'; return t; }
-    if (ext === 'docx') return (await mammoth.extractRawText({ arrayBuffer: buf })).value;
-    if (ext === 'xlsx') { const wb = XLSX.read(buf, { type: 'array' }); return wb.SheetNames.map(n => XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1 }).flat().join(' ')).join('\n'); }
-    throw new Error('Format not supported');
-  } catch (e) { throw e; }
-}
-function showToast(m, t = 'ok') { const e = document.getElementById('toast'); e.textContent = m; e.className = 'toast ' + t + ' show'; setTimeout(() => e.classList.remove('show'), 3000); }
-function logError(c, e) { const l = JSON.parse(localStorage.getItem('evo_errors') || '[]'); l.push({ t: new Date().toISOString(), c, e: e.message || String(e) }); if (l.length > 100) l.shift(); localStorage.setItem('evo_errors', JSON.stringify(l)); }
-window.onerror = (m, u, l, c, e) => logError('Global', { message: m, line: l, col: c });
-window.addEventListener('unhandledrejection', e => logError('Promise', e.reason));
-
-let hist = [], currentResult = null;
-function populateSelect() { const s = document.getElementById('correctClass'); s.innerHTML = ''; const a = ['договор', 'счёт', 'жалоба', 'заявление', 'запрос', 'письмо', 'акт', 'накладная'].map(x => '📋 ' + x).concat(['низкий', 'средний', 'высокий', 'критический'].map(x => '⚡ ' + x), ['Бухгалтерия', 'Юр. отдел', 'Кадры', 'Руководство', 'ИТ-отдел', 'Продажи', 'Канцелярия', 'Склад', 'СБ'].map(x => '📤 ' + x), ['позитивный', 'нейтральный', 'негативный'].map(x => '💬 ' + x)); a.forEach((c, i) => { const o = document.createElement('option'); o.value = i; o.textContent = c; s.appendChild(o); }); }
-populateSelect();
-window.onload = function () {
-  document.getElementById('status').textContent = '● Готово';
-  const dz = document.getElementById('dz');
-  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
-  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
-  dz.addEventListener('drop', async e => { e.preventDefault(); dz.classList.remove('over'); try { const t = await parseFile(e.dataTransfer.files[0]); document.getElementById('doc').value = t; showToast('📄 Файл загружен', 'ok'); } catch (err) { showToast('❌ ' + err.message, 'err'); } });
-  document.getElementById('doc').addEventListener('keydown', e => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); analyze(); } });
-  try { hist = JSON.parse(localStorage.getItem('evo_hist') || '[]'); renderHist(); } catch (e) { }
-};
-
-async function analyze() { const t = document.getElementById('doc').value.trim(); if (!t) return showToast('⚠️ Введите текст', 'warn'); try { const r = EvoAgentCore.classify(t); currentResult = r; const pc = { 'низкий': 'low', 'средний': 'med', 'высокий': 'high', 'критический': 'cr' }[r.prio] || 'med'; const conf = (r.conf * 100).toFixed(1); const sc = r.sentiment === 'позитивный' ? '#39ff14' : (r.sentiment === 'негативный' ? '#ff4444' : '#ffaa00'); document.getElementById('out').innerHTML = `<div class="dec"><span class="tag type">📋 ${r.type.toUpperCase()}</span><span class="tag ${pc}">⚡ ${r.prio.toUpperCase()}</span><span class="tag route">📤 → ${r.route}</span><span class="tag sentiment" style="border-color:${sc}">💬 ${r.sentiment.toUpperCase()}</span><div class="raz">Уверенность: <b style="color:var(--green)">${conf}%</b></div></div>`; 
-  let ph = '<div style="margin-top:8px;font-size:10px;"><div style="color:var(--border);margin-bottom:4px;">📊 Топ типы:</div>';
-  const scores = r.allScores.t; const total = Object.values(scores).reduce((a,b)=>a+b, 1);
-  const top = Object.keys(scores).sort((a,b)=>scores[b]-scores[a]).slice(0,3);
-  top.forEach(k=>{ const p = ((scores[k]||0)/total)*100; ph+=`<div>${k} <span style="color:var(--green)">${p.toFixed(1)}%</span><div class="prob-bar"><div class="prob-fill" style="width:${p}%"></div></div></div>`; });
-  ph += '</div>'; document.getElementById('probs').innerHTML = ph; 
-  document.getElementById('probs').style.display = 'block'; document.getElementById('fbRow').style.display = 'flex'; hist.unshift({ text: t.substring(0, 80), type: r.type, prio: r.prio, route: r.route, sentiment: r.sentiment, time: new Date().toLocaleTimeString() }); renderHist(); saveHist(); showToast('✅ Анализ завершён', 'ok'); } catch (e) { logError('analyze', e); showToast('❌ Ошибка анализа', 'err'); } }
-function feedback(ok) { const l = hist[0]; if (!l) return; try { if (ok) { EvoAgentCore.addTraining({ f: [], y: l.type, p: l.prio, r: l.route, s: l.sentiment || 'нейтральный' }); showToast('✅ Пример добавлен', 'ok'); } else { const idx = parseInt(document.getElementById('correctClass').value); const all = ['договор', 'счёт', 'жалоба', 'заявление', 'запрос', 'письмо', 'акт', 'накладная', 'низкий', 'средний', 'высокий', 'критический', 'Бухгалтерия', 'Юр. отдел', 'Кадры', 'Руководство', 'ИТ-отдел', 'Продажи', 'Канцелярия', 'Склад', 'СБ', 'позитивный', 'нейтральный', 'негативный']; const lb = all[idx]; if (['договор', 'счёт', 'жалоба', 'заявление', 'запрос', 'письмо', 'акт', 'накладная'].includes(lb)) l.type = lb; else if (['низкий', 'средний', 'высокий', 'критический'].includes(lb)) l.prio = lb; else if (['Бухгалтерия', 'Юр. отдел', 'Кадры', 'Руководство', 'ИТ-отдел', 'Продажи', 'Канцелярия', 'Склад', 'СБ'].includes(lb)) l.route = lb; else l.sentiment = lb; EvoAgentCore.addTraining({ f: [], y: l.type, p: l.prio, r: l.route, s: l.sentiment || 'нейтральный' }); 
-    // ✅ УСИЛЕННЫЙ ФИДБЕК: 5 шагов эволюции за одну ошибку
-    for(let i=0;i<5;i++) EvoAgentCore.addTraining({f:[],y:l.type,p:l.prio,r:l.route,s:l.sentiment||'нейтральный'});
-    showToast('✏️ Исправлено (5 шагов эволюции)', 'ok'); 
-  } renderHist(); saveHist(); } catch (e) { logError('feedback', e); showToast('❌ Ошибка', 'err'); } }
-function renderHist() { const e = document.getElementById('hist'); let h = ''; for (const i of hist) { const pc = { 'низкий': 'low', 'средний': 'med', 'высокий': 'high', 'критический': 'cr' }[i.prio] || 'med'; h += `<div class="hi"><b>${i.type}</b> · <span class="tag ${pc}">${i.prio}</span> · ${i.time} · 💬 ${i.sentiment || 'нейтральный'}</div>`; } e.innerHTML = h || '<div style="color:var(--dim);text-align:center;padding:16px">История пуста</div>'; }
-function saveHist() { try { localStorage.setItem('evo_hist', JSON.stringify(hist)); } catch (e) { } }
-function loadSample(i) { const s = ['ДОГОВОР ПОСТАВКИ №123\nМежду ООО «Альфа» и АО «Бета». Сумма: 500 000 руб.', 'СЧЁТ №456\nООО «ТехноСервис», ИНН 7701234567. Сумма: 1 250 000 руб.', 'ПРЕТЕНЗИЯ №78\nНарушение сроков. Требуем неустойку.']; document.getElementById('doc').value = s[i]; }
-function evo(n) { if (EvoAgentCore.getState().samples < 2) return showToast('⚠️ Нужно ≥2 примера', 'warn'); for (let i = 0; i < n; i++) EvoAgentCore.addTraining({ f: [], y: hist[0]?.type || 'договор', p: 'средний', r: 'Бухгалтерия', s: 'нейтральный' }); showToast('⚡ Эволюция', 'ok'); }
-function resetAll() { const i = prompt('Введите СБРОС'); if (i !== 'СБРОС' && i !== 'сброс') return; hist = []; localStorage.removeItem('evo_hist'); renderHist(); showToast('↺ Сброшено', 'ok'); }
-function tab(i, b) { document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); document.querySelectorAll('.tab').forEach((x, j) => x.classList.toggle('active', j === i)); }
-async function processBatch() { const fs = document.getElementById('batchFiles').files; if (!fs.length) return showToast('📂 Выберите файлы', 'warn'); const r = document.getElementById('batchRes'); r.innerHTML = '⏳ Обработка...'; for (let i = 0; i < fs.length; i++) { try { const t = await parseFile(fs[i]); const c = EvoAgentCore.classify(t); const conf = (c.conf * 100).toFixed(0); r.innerHTML += `<div>✅ ${fs[i].name} → <b style="color:var(--green)">${c.type}</b> (${conf}%)</div>`; } catch (e) { r.innerHTML += `<div style="color:var(--err)">❌ ${fs[i].name}</div>`; } } r.innerHTML += `<div style="margin-top:8px;color:var(--green)">✅ Готово</div>`; }
-function loadDemoData() { const r = document.getElementById('batchRes'); r.innerHTML = '⏳ Демо...'; const ds = ['ДОГОВОР...', 'СЧЁТ...', 'ЖАЛОБА...'].map((_, i) => { loadSample(i); return document.getElementById('doc').value; }); setTimeout(() => { let html = ''; for (const t of ds) { const c = EvoAgentCore.classify(t); html += `<div>✅ Демо → <b style="color:var(--green)">${c.type}</b></div>`; } r.innerHTML += html; showToast('✅ Демо', 'ok'); }, 300); }
-function exportJSON() { try { const d = hist.map(h => ({ text: h.text, type: h.type, prio: h.prio, route: h.route, time: h.time })); const b = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'evo.json'; a.click(); showToast('✅ JSON', 'ok'); } catch (e) { showToast('❌', 'err'); } }
-function exportCSV() { try { const h = 'text,type,prio,route,time\n'; const r = hist.map(x => [x.text, x.type, x.prio, x.route, x.time].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n'); const b = new Blob([h + r], { type: 'text/csv' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'evo.csv'; a.click(); showToast('✅ CSV', 'ok'); } catch (e) { showToast('❌', 'err'); } }
-function backupTraining() { try { const d = { gen: EvoAgentCore.getState().generation, samples: EvoAgentCore.getState().samples, hist, ts: Date.now() }; const b = new Blob([JSON.stringify(d)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'backup.json'; a.click(); showToast('✅ Бэкап', 'ok'); } catch (e) { showToast('❌', 'err'); } }
-function exportLogs() { try { const d = JSON.parse(localStorage.getItem('evo_errors') || '[]'); const b = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'logs.json'; a.click(); showToast('📋 Логи', 'ok'); } catch (e) { showToast('❌', 'err'); } }
-function startPayment(tier) {
-  const prices = { STD: 14900, BIZ: 59900, OEM: 250000 };
-  const email = prompt('Введите ваш Email для чека:');
-  if (!email) return;
-  try {
-    const ref = localStorage.getItem('evo_ref') || 'DIRECT';
-    fetch(`/api/pay?amount=${prices[tier]}&description=${tier}&ref=${ref}&email=${email}`).then(res=>res.json()).then(data=>{if(data.redirectUrl)window.location.href=data.redirectUrl;}).catch(()=>alert('Сервер оплаты не подключен'));
-  } catch (e) { alert('Ошибка соединения'); }
+// Проверка лицензии при загрузке
+if (!checkLicense()) {
+  document.body.innerHTML = '<div style="text-align:center;padding:100px;color:#ff4444;font-size:18px">❌ Лицензия не активирована</div>';
 }
 
-const cv = document.getElementById('bg'), cx = cv.getContext('2d'); let W, H, ms = { x: -999, y: -99 }, pts = []; const PC = 250, CL = ['#00f3ff', '#ff0066', '#ffaa00', '#39ff14']; function rz() { W = cv.width = innerWidth; H = cv.height = innerHeight; } addEventListener('resize', rz); rz(); addEventListener('mousemove', e => { ms.x = e.clientX; ms.y = e.clientY; }); function Pt() { this.x = Math.random() * W; this.y = H + Math.random() * 100; this.vx = (Math.random() - .5) * .5; this.vy = -Math.random() * 2 - .5; this.l = 1; this.d = .003 + Math.random() * .004; this.s = Math.random() * 3 + 1; this.c = CL[Math.floor(Math.random() * CL.length)]; this.f = Math.random() * 6; } Pt.prototype.up = function () { const dx = ms.x - this.x, dy = ms.y - this.y, d = Math.hypot(dx, dy); if (d < 120) { const f = 1 - d / 120; this.vx += dx / d * f * .8; this.vy += dy / d * f * .8; } this.x += this.vx; this.y += this.vy; this.vy *= .99; this.vx *= .98; this.l -= this.d; this.f += .1; if (this.l <= 0) { this.x = Math.random() * W; this.y = H + Math.random() * 100; this.vx = (Math.random() - .5) * .5; this.vy = -Math.random() * 2 - .5; this.l = 1; } }; Pt.prototype.dr = function () { cx.globalCompositeOperation = 'lighter'; cx.shadowBlur = 10; cx.shadowColor = this.c; cx.beginPath(); cx.arc(this.x, this.y, this.s * (.8 + Math.sin(this.f) * .2), 0, Math.PI * 2); cx.fillStyle = this.c + Math.floor(this.l * 255).toString(16).padStart(2, '0'); cx.fill(); cx.shadowBlur = 0; cx.globalCompositeOperation = 'source-over'; }; for (let i = 0; i < PC; i++) pts.push(new Pt()); function an() { cx.clearRect(0, 0, W, H); for (const p of pts) { p.up(); p.dr(); } requestAnimationFrame(an); } an(); addEventListener('visibilitychange', () => { if (document.hidden) pts = []; else for (let i = 0; i < PC; i++) pts.push(new Pt()); });
+function showToast(m, t = 'ok') {
+  const e = document.getElementById('toast');
+  e.textContent = m;
+  e.className = 'toast ' + t + ' show';
+  setTimeout(() => e.classList.remove('show'), 3000);
+}
+
+function analyze() {
+  const t = document.getElementById('doc').value.trim();
+  if (!t) return showToast('⚠️ Введите текст', 'err');
+
+  try {
+    const r = EvoAgent.classify(t);
+    const pc = { 'низкий': 'low', 'средний': 'med', 'высокий': 'high', 'критический': 'cr' }[r.prio] || 'med';
+    const conf = (r.confidence * 100).toFixed(1);
+    const sc = r.sentiment === 'позитивный' ? '#39ff14' : (r.sentiment === 'негативный' ? '#ff4444' : '#ffaa00');
+
+    document.getElementById('out').innerHTML = `
+      <div class="dec">
+        <span class="tag type">📋 ${r.type.toUpperCase()}</span>
+        <span class="tag ${pc}">⚡ ${r.prio.toUpperCase()}</span>
+        <span class="tag route">📤 → ${r.route}</span>
+        <span class="tag sentiment" style="border-color:${sc}">💬 ${r.sentiment.toUpperCase()}</span>
+        <div class="raz">Уверенность: <b style="color:var(--green)">${conf}%</b></div>
+      </div>
+    `;
+
+    let ph = '<div style="margin-top:8px;font-size:10px;"><div style="color:var(--border);margin-bottom:4px;">📊 Топ типы:</div>';
+    const scores = r.scores.types;
+    const total = Object.values(scores).reduce((a, b) => a + b, 1);
+    const top = Object.keys(scores).sort((a, b) => scores[b] - scores[a]).slice(0, 3);
+    top.forEach(k => {
+      const p = ((scores[k] || 0) / total) * 100;
+      ph += `<div>${k} <span style="color:var(--green)">${p.toFixed(1)}%</span><div class="prob-bar"><div class="prob-fill" style="width:${p}%"></div></div></div>`;
+    });
+    ph += '</div>';
+    document.getElementById('probs').innerHTML = ph;
+    document.getElementById('probs').style.display = 'block';
+
+    const xai = EvoAgent.explain(t);
+    let xaiHtml = '<h3>🔍 Почему такое решение?</h3>';
+    xai.reasons.forEach(r => { xaiHtml += `<div>${r}</div>`; });
+    document.getElementById('xaiBox').innerHTML = xaiHtml;
+    document.getElementById('xaiBox').style.display = 'block';
+
+    showToast('✅ Анализ завершён', 'ok');
+  } catch (e) {
+    showToast('❌ Ошибка: ' + e.message, 'err');
+  }
+}
+
+function loadSample(i) {
+  const s = [
+    'ДОГОВОР ПОСТАВКИ №123\nМежду ООО «Альфа» и АО «Бета». Сумма: 500 000 руб.',
+    'СЧЁТ №456\nООО «ТехноСервис», ИНН 7701234567. Сумма: 1 250 000 руб.',
+    'ПРЕТЕНЗИЯ №78\nНарушение сроков. Требуем неустойку.'
+  ];
+  document.getElementById('doc').value = s[i];
+}
+
+document.getElementById('doc').addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') {
+    e.preventDefault();
+    analyze();
+  }
+});
 </script>
 </body>
 </html>
