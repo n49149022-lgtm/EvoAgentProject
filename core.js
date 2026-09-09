@@ -10,11 +10,43 @@
   const SENTIMENTS = ['позитивный','нейтральный','негативный'];
   const NO = 37, NF = 66, NH = 32;
 
-  // Веса встраиваются при сборке (scripts/build-client.js)
-  const WEIGHTS = __WEIGHTS_PLACEHOLDER__;
-  const { W1, b1, W2, b2 } = WEIGHTS;
+  // ✅ Веса: либо встроены сборкой, либо загружаются через fetch
+  let WEIGHTS = null;
+  let W1, b1, W2, b2;
+  let ready = false;
+  let readyCallbacks = [];
 
-  // LEX, BIGRAMS, POS_WORDS — из core/features.js
+  // Попытка взять встроенные веса (для продакшна после сборки)
+  if (typeof __EVO_WEIGHTS__ !== 'undefined') {
+    WEIGHTS = __EVO_WEIGHTS__;
+    initWeights(WEIGHTS);
+  } else if (typeof window !== 'undefined') {
+    // Режим разработки — загружаем weights.json
+    fetch('weights.json')
+      .then(r => { if (!r.ok) throw new Error('weights.json not found'); return r.json(); })
+      .then(w => { initWeights(w); })
+      .catch(e => {
+        console.error('❌ Не удалось загрузить веса:', e.message);
+        console.error('💡 Запустите: npm run build:weights');
+      });
+  }
+
+  function initWeights(w) {
+    W1 = w.W1;
+    b1 = Float64Array.from(w.b1);
+    W2 = w.W2;
+    b2 = Float64Array.from(w.b2);
+    ready = true;
+    readyCallbacks.forEach(cb => cb());
+    readyCallbacks = [];
+  }
+
+  // Публичный API для ожидания готовности
+  function onReady(cb) {
+    if (ready) cb();
+    else readyCallbacks.push(cb);
+  }
+
   const LEX = [
     {w:['договор','контракт','соглашение','обязательств','сторона','подряд','поставк','услуг','исполнител','заказчик']},
     {w:['счёт','оплат','налог','ндс','руб','коп','сумм','цен','стоимост','тариф','платёж']},
@@ -44,6 +76,10 @@
     ...BIGRAMS.map(b => `Биграма «${b}»`),
     ...POS_WORDS.map(w => `Позиция: «${w}»`)
   ];
+
+  function assertReady() {
+    if (!ready) throw new Error('Модель не загружена. Запустите: npm run build:weights');
+  }
 
   function extract(text) {
     if (typeof text !== 'string') throw new TypeError('Text must be string');
@@ -125,6 +161,7 @@
   }
 
   function classify(text) {
+    assertReady();
     const feat = extract(text);
     const { out } = forward(feat);
     const tS = softmax(out, 0, TYPES.length);
@@ -145,6 +182,7 @@
   }
 
   function explain(text) {
+    assertReady();
     const feat = extract(text);
     const pred = classify(text);
     const lo = text.toLowerCase();
@@ -177,5 +215,9 @@
     return { prediction: pred, reasons: reasons.slice(0, 10) };
   }
 
-  return { classify, explain, extract, TYPES, PRIOS, ROUTES, SENTIMENTS, NF, NH, NO, FEAT_NAMES };
+  return {
+    classify, explain, extract, onReady,
+    TYPES, PRIOS, ROUTES, SENTIMENTS, NF, NH, NO, FEAT_NAMES,
+    isReady: () => ready
+  };
 });
