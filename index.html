@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1200">
 <title>EvoAgent STD v7.1</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧬</text></svg>">
 <script src="license-check.js"></script>
 <script src="core.js"></script>
 <style>
-/* Стили из v6.1 — без изменений */
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700&display=swap');
 :root{--bg:#05050a;--panel:#0c101d;--border:#00f3ff;--accent:#ff0066;--amber:#ffaa00;--green:#39ff14;--text:#e0e6f0;--dim:#4a5570;--err:#ff4444}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -45,9 +45,17 @@ textarea{min-height:140px;font-size:14px}
 .toast.show{transform:translateY(0);opacity:1}
 .toast.ok{background:rgba(57,255,20,0.15);border:1px solid var(--green);color:var(--green)}
 .toast.err{background:rgba(255,68,68,0.15);border:1px solid var(--err);color:var(--err)}
+#loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;color:var(--dim);font-size:14px}
+#loading.hidden{display:none}
+.status-bar{padding:6px 10px;border-radius:4px;font-size:10px;display:inline-block;margin-top:8px}
+.status-bar.ok{background:rgba(57,255,20,0.15);color:var(--green)}
+.status-bar.err{background:rgba(255,68,68,0.15);color:var(--err)}
 </style>
 </head>
 <body>
+
+<div id="loading">⏳ Загрузка модели...</div>
+
 <div class="container">
   <header>
     <h1>🧬 EVOAGENT STD v7.1</h1>
@@ -64,6 +72,7 @@ textarea{min-height:140px;font-size:14px}
         <button class="btn accent" onclick="loadSample(1)">Счёт</button>
         <button class="btn green" onclick="loadSample(2)">Жалоба</button>
       </div>
+      <div id="statusBar" class="status-bar err">● Ожидание загрузки...</div>
     </div>
 
     <div class="panel">
@@ -78,10 +87,29 @@ textarea{min-height:140px;font-size:14px}
 <div id="toast" class="toast"></div>
 
 <script>
-// Проверка лицензии при загрузке
-if (!checkLicense()) {
+// Проверка лицензии
+if (typeof checkLicense === 'function' && !checkLicense()) {
   document.body.innerHTML = '<div style="text-align:center;padding:100px;color:#ff4444;font-size:18px">❌ Лицензия не активирована</div>';
 }
+
+// Ожидание загрузки модели
+EvoAgent.onReady(() => {
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('statusBar').className = 'status-bar ok';
+  document.getElementById('statusBar').textContent = '● Модель загружена';
+});
+
+// Таймаут на случай если weights.json не загрузился
+setTimeout(() => {
+  if (!EvoAgent.isReady()) {
+    document.getElementById('loading').innerHTML =
+      '<div style="text-align:center;color:#ff4444">' +
+      '<div style="font-size:18px;margin-bottom:10px">❌ Модель не загружена</div>' +
+      '<div style="font-size:12px;color:#888">Запустите: <code style="background:#222;padding:2px 6px;border-radius:3px">npm run build:weights</code></div>' +
+      '<div style="font-size:12px;color:#888;margin-top:4px">Затем скопируйте <code style="background:#222;padding:2px 6px;border-radius:3px">core/weights.json</code> в папку с <code style="background:#222;padding:2px 6px;border-radius:3px">index.html</code></div>' +
+      '</div>';
+  }
+}, 3000);
 
 function showToast(m, t = 'ok') {
   const e = document.getElementById('toast');
@@ -91,6 +119,8 @@ function showToast(m, t = 'ok') {
 }
 
 function analyze() {
+  if (!EvoAgent.isReady()) return showToast('⏳ Модель ещё загружается', 'err');
+
   const t = document.getElementById('doc').value.trim();
   if (!t) return showToast('⚠️ Введите текст', 'err');
 
